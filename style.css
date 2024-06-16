@@ -1,0 +1,201 @@
+body {
+    color: white;
+    background-color: #000000;
+}
+
+a {
+    border-bottom: 1px solid #DC758F;
+    color: inherit;
+    text-decoration: none;
+}
+
+a:hover {
+    background-color: #873D48;
+    color: #ffffff;
+}
+
+code {
+    padding: .1em .2em;
+}
+
+code {
+    font-family: monospace;
+}
+
+h1::before {
+    color: #DC758F;
+    content: '§ ';
+}
+
+h1 {
+    font-weight: bold;
+}
+
+h2::before {
+    color: #DC758F;
+    content: '§ ';
+}
+
+h3 {
+    font-size: 20px;
+}
+
+h3::before {
+    color: #DC758F;
+    content: '§ ';
+}
+
+p {
+    font-family: sans-serif;
+}
+
+pre {
+    background-color: #1e1e1e;
+    line-height: 1.4;
+    overflow-x: auto;
+    padding: 1em;
+}
+
+pre {
+    display: block;
+    font-family: monospace;
+    unicode-bidi: isolate;
+    white-space: pre;
+    margin: 1em 0px;
+}
+
+span.decl {
+    color: #DFAF7A;
+}
+
+span.func {
+    color: #9099D9;
+}
+
+span.type {
+    color: #FEACD0;
+}
+
+.meta {
+    color: #999;
+    letter-spacing: -0.5px;
+}
+
+.content {
+    margin-bottom: 4em;
+    margin-left: auto;
+    margin-right: auto;
+    max-width: 900px;
+    padding: 0 1ch;
+    word-wrap: break-word;
+    text-wrap: pretty;
+}
+
+.example {
+  font-family: monospace;
+  font-size: 24px;
+  line-height: 1.5;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 10vh;
+}
+
+.header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between; /* Ensure elements are spaced evenly */
+    background-color: #000000; /* Example background color */
+    padding: 10px 20px; /* Adjust padding as needed */
+}
+
+/* Styles for the profile photo */
+.profile-photo img {
+    width: 4rem; /* Adjust size as needed */
+    height: 4rem; /* Adjust size as needed */
+    border-radius: 5px; /* Makes the image round */
+    margin-right: 20px;
+    align-items: center;
+}
+
+/* Styles for the header content */
+.header-content {
+    display: flex;
+    align-items: center;
+}
+
+/* Styles for the header text */
+.header-text {
+    display: flex;
+    flex-direction: column;
+    line-height: 1px;
+}
+
+/* Styles for the website name */
+.website-name {
+    font-size: 1.5rem;
+    font-weight: bold;
+}
+
+.website-name::before {
+    content: "";
+}
+
+.your-name::before {
+    content: "";
+}
+
+/* Styles for your name */
+.your-name {
+    font-size: 15px;
+    font-family: Noto Sans Devanagari;
+}
+
+.email {
+    font-size: 10px;
+    color: #666;
+}
+
+/* Styles for the main navigation */
+.main-nav ul {
+    list-style-type: none; /* Remove default list styling */
+    display: flex;
+}
+
+.main-nav ul li {
+    margin-right: 10px; /* Adjust spacing between navigation items */
+}
+
+.main-nav ul li a {
+    text-decoration: none; /* Remove underline from links */
+    color: #ffffff; /* Example link color */
+    font-size: 1rem; /* Example font size */
+}
+
+@media only screen and (max-width: 520px) {
+    .example {
+      font-size: 18px;
+    }
+
+    .profile-photo {
+	visibility: hidden;
+    }
+
+    .header-text {
+	visibility: hidden;
+    }
+  }
+
+@media only screen and (max-width: 460px) {
+    .example {
+      font-size: 16px;
+    }
+
+    .profile-photo {
+	display: none;
+    }
+
+    .header-text {
+	display: none;
+    }
+}

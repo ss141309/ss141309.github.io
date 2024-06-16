@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en-IN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width">
+    <meta name="author" content="समीर सिंह Sameer Singh">
+    <meta
+      name="description"
+      content="Blog post on writing a gap buffer implementation
+	       in C.">
+    <link rel="stylesheet" href="/style.css">
+    <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16.png">
+    <link rel="manifest" href="/images/site.webmanifest">
+    <link rel="mask-icon" href="/images/safari-pinned-tab.svg" color="#000000">
+    <meta name="theme-color" content="#000000">
+
+    <title>Writing a Gap Buffer implementation in C</title>
+  </head>
+  <body>
+    <div class="content">
+      <header class="header">
+        <div class="header-content">
+	  <div class="profile-photo">
+            <img src="/images/portrait.webp" alt="Portrait Photo">
+          </div>
+          <div class="header-text">
+            <h1 class="website-name"><a href="/index.html">Mānasāhlāda</a></h1>
+            <h2 class="your-name">समीर सिंह Sameer Singh</h2>
+	    <p class="email"><a href="mailto:lumarzeli30@gmail.com">lumarzeli30@gmail.com</a></p>
+          </div>
+	  </div>
+          <nav class="main-nav">
+            <ul>
+              <li><a href="https://github.com/ss141309">Github</a></li>
+              <li><a href="https://www.linkedin.com/in/sameer-singh-425b0724b/">Linkedin</a></li>
+            </ul>
+          </nav>
+        
+    </header>
+      <h1 id="writing-a-gap-buffer-in-c"><a href="#writing-a-gap-buffer-in-c">Writing a Gap Buffer Implementation in C</a></h1>
+      <div class="meta"><time datetime="2024-06-16">June 16, 2024</time></div>
+
+      <h2 id="motivation"><a href="#motivation">Motivation</a></h2>
+      <p>Summer break started a month ago, and it had been a long time since I coded something significant. I also wanted to improve my C skills since I never wrote anything involving manual memory management in it. Therefore I chose to write a gap buffer because it involves allocating memory to heap and also only requires about 100 lines of code for a barebones implementation.</p>
+
+      <h2 id="what-is-a-gap-buffer"><a href="#what-is-a-gap-buffer">What is a Gap Buffer?</a></h2>
+      <p>Gap Buffers among other data structures like <a href="https://en.wikipedia.org/wiki/Piece_table" target="_blank" rel="noopener">piece table</a> and <a href="https://en.wikipedia.org/wiki/Rope_(data_structure)" target="_blank" rel="noopener">rope</a> are used in text editors to store text. GNU Emacs <a href="https://git.savannah.gnu.org/cgit/emacs.git/tree/src/buffer.h#n226" target="_blank" rel="noopener">famously uses gap buffer</a> to store its text, while piece table and rope are used by <a href="https://code.visualstudio.com/blogs/2018/03/23/text-buffer-reimplementation" target="_blank" rel="noopener">VS Code</a> and <a href="https://zed.dev/blog/zed-decoded-rope-sumtree" target="_blank" rel="noopener">Zed</a>
+respectively.</p>
+
+      <p>Gap Buffer is the simplest data structure out of all of them. It consists of a <code>text_buffer</code> which is an array where the text is actually stored, a <code>gap_start</code> position which defines the gap offset and a <code>gap_len</code> which as the name suggests defines the length of the gap. Placing a "gap" inside an array helps in an efficient insertion and deletion of the text for localized edits.</p>
+	<p>This is how the gap buffer is defined in the code base:</p>
+      <pre><code>
+<span class="decl">typedef struct</span> {
+    <span class="type">size</span> buffer_size;
+    <span class="type">usize</span> gap_start;
+    <span class="type">size</span> gap_len;
+    <span class="type">size</span> old_gap_len;
+
+    <span class="type">u8</span> data[];
+} <span class="type">GapBuffer</span>;
+      </code></pre>
+      <p>Now the question arises that how does placing a gap inside an array makes insertion and deletion more efficient? To better understand this let us take up an example, Assume an array of size <code>10</code>, which contains the string <code>"hello"</code> inside it:</p>
+      <div class="example">
+	['h','e','l','l','o',_____]
+      </div>
+      <p>If we then try to insert <code>'1'</code> at index <code>1</code> of the array:</p>
+      <div class="example">
+	['h','1','e','l','l','o',____]
+      </div>
+      <p>You can see that we had to shift every element in front of <code>'1'</code> forward. This has to be done for every insertion and deletion we perform on this array. If we try to do the same operations in a <strong>gap buffer</strong>, this is what would happen:</p>
+      <div class="example">
+	['h','e','l','l','o',_____]
+      </div>
+      <p>First the gap has to be shifted in the position where the insertion operation has to be performed.</p>
+      <div class="example">
+	['h',_____'e','l','l','o']
+      </div>
+      <p>We can now insert the characters</p>
+      <div class="example">
+	['h','1',____'e','l','l','o']
+      </div>
+      <div class="example">
+	['h','1','2',___'e','l','l','o']
+      </div>
+      <div class="example">
+	['h','1','2','3',__'e','l','l','o']
+      </div>
+      <p>Apart from the initial shifting of the gap, the subsequent inserts only took <em>O(1)</em> time.</p>
+      <h2 id="implementing-a-gap-buffer"><a href="#implementing-a-gap-buffer">Implementing a Gap Buffer</a></h2>
+      <h3 id="gapbuffer-new"><a href="#gapbuffer-new"><code>GapBuffer_new</code></a></h3>
+      <pre><code>
+<span class="type">bool</span> <span class="decl">GapBuffer_new</span>(<span class="type">GapBuffer **buffer, size req_size</span>) {
+    <span class="func">const</span> <span class="type">size max_size</span> = (PTRDIFF_MAX - <span class="func">sizeof</span>(GapBuffer))/<span class="func">sizeof</span>(u8);
+    return_value_if(req_size &gt; max_size, <span class="type">false</span>, ERR_ARITHEMATIC_OVERFLOW);
+
+    <span class="type">*buffer</span> = malloc(<span class="func">sizeof</span>(GapBuffer) + req_size * <span class="func">sizeof</span>(u8));
+
+    return_value_if(*buffer == <span class="type">NULL</span>, <span class="type">false</span>, ERR_OUT_OF_MEMORY);
+
+    (*buffer)-&gt;<span class="type">gap_start</span> = 0;
+    (*buffer)-&gt;<span class="type">buffer_size</span> = req_size;
+    (*buffer)-&gt;<span class="type">gap_len</span> = req_size;
+    (*buffer)-&gt;<span class="type">old_gap_len</span> = req_size;
+
+    <span class="func">return</span> <span class="type">true</span>;
+}
+      </code></pre>
+      <p>We start by allocating some arbitrary size for our gap buffer, we don't care what the size is as it can be increased later on. Right now the whole buffer is a gap with <code>gap_start</code> starting from index <code>0</code> and <code>gap_len</code> being the same size as <code>buffer_size</code>.</p>
+      <h3 id="aside"><a href="#aside">Aside</a></h3>
+      <p>I have added overflow checks throughout the program, such as in line no. 3 in the <code>GapBuffer_new</code> function as suggested by <a href="https://www.reddit.com/r/C_Programming/comments/1df96wm/comment/l8if0xr/" target="_blank" rel="noopener">Chris Wellons from nullprogram.com</a>.
+I have also used the types and string representation as suggested by Chris in his blog <a href="https://nullprogram.com/blog/2023/10/08/" target="_blank" rel="noopener">My personal C coding style as of late 2023.</a></p>
+      <p>The macro <code>return_value_if</code> is among the other error handling macros defined in <code>include/utils.h</code> which I took from <a href="https://brightprogrammer.in" target="_blank" rel="noopener">brightprogrammer's</a> excellent <a href="https://github.com/brightprogrammer/CrossFile/blob/master/Include/Anvie/Common.h#L89" target="_blank" rel="noopener">CrossFile</a> library.</p>
+      <h3 id="gapbuffer-insert"><a href="#gapbuffer-insert"><code>GapBuffer_insert</code></a></h3>
+      <pre><code>
+<span class="type">bool</span> <span class="decl">GapBuffer_insert</span>(<span class="type">GapBuffer **buffer, const s8 string, usize position</span>) {
+    return_value_if(expandGap(buffer, string.len) == <span class="type">false</span>, <span class="type">false</span>, ERR_OUT_OF_MEMORY);
+    shiftGapToPosition(*buffer, position);
+    memcpy((*buffer)->data + (*buffer)->gap_start, string.data, string.len);
+
+    (*buffer)-&gt;<span class="type">gap_start</span> += string.len;
+    (*buffer)-&gt;<span class="type">gap_len</span> -= string.len;
+
+    <span class="func">return</span> <span class="type">true</span>;
+}
+      </code></pre>
+      <p>This is one of the core functions of the library; you give it a string and a position and it will insert that string at the specified index. This is done by using the <code>memcpy</code> function, which is copying the contents of the string to the start of the gap buffer. </p>
+      <p>But before we insert the string into the buffer we have to ensure that the gap length is big enough to fit the contents of the string and also if it is in the appropriate postion. This is done by the <code>expandGap</code> and <code>shiftGapToPosition</code> functions respectively.</p>
+      <h3 id="expand-gap"><a href="#expand-gap"><code>expandGap</code></a></h3>
+      <pre><code>
+<span class="func">static</span> <span class="type">bool</span> <span class="decl">expandGap</span>(<span class="type">GapBuffer **buffer, size str_len</span>) {
+    <span class="func">const</span> <span class="type">GapBuffer *orig_buffer</span> = *buffer;
+
+    <span class="func">if</span> (str_len &lt;= orig_buffer-&gt;gap_len) {
+      (*buffer)-><span class="type">old_gap_len</span> = (*buffer)-&gt;gap_len;
+      <span class="func">return</span> <span class="type">true</span>;
+    }
+
+    return_value_if(str_len > PTRDIFF_MAX / 2, <span class="type">false</span>, ERR_ARITHEMATIC_OVERFLOW);
+    return_value_if(orig_buffer->buffer_size &lt; 0 || orig_buffer->gap_len &lt; 0, <span class="type">false</span>,
+                    ERR_ARITHEMATIC_OVERFLOW);
+    return_value_if(orig_buffer->buffer_size - orig_buffer->gap_len &gt; PTRDIFF_MAX / (2 * str_len),
+                    <span class="type">false</span>, ERR_ARITHEMATIC_OVERFLOW);
+
+    <span class="func">const</span> <span class="type">size req_size</span> = (orig_buffer-&gt;buffer_size - orig_buffer-&gt;gap_len) + (2 * str_len);
+    <span class="func">const</span> <span class="type">size max_size</span> = (PTRDIFF_MAX - <span class="func">sizeof</span>(GapBuffer))/<span class="func">sizeof</span>(u8);
+    return_value_if(req_size &gt; max_size, <span class="type">false</span>, ERR_ARITHEMATIC_OVERFLOW);
+
+    <span class="type">GapBuffer *new_buffer</span> = realloc(*buffer, <span class="func">sizeof</span>(GapBuffer) + req_size * <span class="func">sizeof</span>(u8));
+
+    <span class="func">if</span> (new_buffer) {
+      new_buffer-&gt;<span class="type">buffer_size</span> = req_size;
+      new_buffer-&gt;<span class="type">old_gap_len</span> = new_buffer-&gt;gap_len;
+      new_buffer-&gt;<span class="type">gap_len</span> = 2 * str_len;
+
+      <span class="type">*buffer</span> = new_buffer;
+    } else {
+      return_value_if(new_buffer == <span class="type">NULL</span>, <span class="type">false</span>, ERR_OUT_OF_MEMORY);
+    }
+
+    <span class="func">return</span> <span class="type">true</span>;
+}	  
+      </code></pre>
+      <p>We check whether the length of the string to be inserted is less than the gap length or not, if it is we simply return from the function. The real work starts if the string length is bigger. We now have to calculate the new buffer size to accomodate the string, this is done by allocating double the string length to the buffer.</p>
+      <pre><code>
+    <span class="func">const</span> <span class="type">size req_size</span> = (orig_buffer->buffer_size - orig_buffer->gap_len) + (<strong>2 * str_len</strong>);
+    <span class="type">GapBuffer *new_buffer</span> = realloc(*buffer, <span class="func">sizeof</span>(GapBuffer) + req_size * <span class="func">sizeof</span>(u8));
+      </pre></code>
+      <p>If the realloc is successful the buffer size and gap length are updated appropriately and now this new buffer is ready for use.</p>
+      <h3 id="shift-gap-to-position"><a href="#shift-gap-to-position"><code>shiftGapToPosition</code></a></h3>
+      <pre><code>
+<span class="func">static</span> <span class="type">void</span> <span class="decl">shiftGapToPosition</span>(<span class="type">GapBuffer *buffer, usize position</span>) {
+    <span class="func">if</span> (position == buffer->gap_start) {
+      <span class="func">return</span>;
+    } <span class="type">else if</span> (position &lt; buffer-&gt;gap_start) {
+      <span class="func">const</span> <span class="type">size num</span> = (buffer-&gt;gap_start - position) * sizeof(u8);
+
+      memmove(buffer-&gt;data + buffer-&gt;gap_start + buffer->gap_len - num, buffer->data + position, num);
+    } <span class="func">else</span> {
+      <span class="func">const</span> <span class="type">size num</span> = (position - buffer-&gt;gap_start) * sizeof(u8);
+
+      memmove(buffer-&gt;data + buffer-&gt;gap_start,
+              buffer-&gt;data + buffer-&gt;gap_start + buffer-&gt;old_gap_len, num);
+    }
+
+    buffer-&gt;<span class="type">gap_start</span> = position;
+}	  
+      </code></pre>
+      <p>After expanding the gap, we have to make sure if it is at the correct position (the position where the string has to be inserted), if it is, we simply return from the function, this is what makes the text insertion <em>O(1)</em> if the gap is correctly placed.</p>
+      <p>Apart from this we have two conditions which moves the gap either left or right as necessary.</p>
+      <p>Now if you'll come closer, I will let you in on a secret. The gap in a gap buffer is not actually a gap 😱, I know right. There is text present in that slice of the array, the only thing that is different for this portion is that we can overwrite it. Just like how a deleted file is not physically removed from the storage, it is only marked as overwritable.</p>
+      <p>So if we take our previous example</p>
+      <div class="example">
+	['h',_____'e','l','l','o']
+      </div>
+      <p>actually looks like</p>
+      <div class="example">
+	['h','e','l','l','o',_,'e','l','l','o']
+      </div>
+      <p>with <code>gap_start=1</code> and <code>gap_len=5</code></p>
+      <h3 id="gapbuffer-delete"><a href="#gapbuffer-delete"><code>GapBuffer_delete</code></a></h3>
+      <p>This is also how we delete characters from the buffer, we just mark them as being a part of the gap.</p>
+      <pre><code>
+<span class="type">bool</span> <span class="decl">GapBuffer_delete</span>(<span class="type">GapBuffer *buffer, usize position, size bytes</span>) {
+    <span class="func">const</span> <span class="type">size total_bytes</span> = (buffer-&gt;buffer_size - buffer-&gt;gap_len) - position;
+    return_value_if(total_bytes &lt; bytes, <span class="type">false</span>, ERR_INVALID_SIZE);
+
+    shiftGapToPosition(buffer, position);
+    <strong>buffer-&gt;<span class="type">gap_len</span> += bytes;</strong>
+
+    <span class="func">return</span> <span class="type">true</span>;
+}
+      </code></pre>
+      <h3 id="gapbuffer-replace"><a href="#gapbuffer-replace"><code>GapBuffer_replace</code></a></h3>
+      <p>With most of the fundamental operations implemented we can now create new functions by using them. Such as writing a <code>replace</code> which is just composed of <code>GapBuffer_delete</code> and <code>GapBuffer_insert</code> function.</p>
+      <pre><code>
+<span class="type">bool</span> <span class="decl">GapBuffer_replace</span>(<span class="type">GapBuffer **buffer, const s8 string, usize position</span>) {
+    return_value_if(GapBuffer_delete(*buffer, position, string.len) == <span class="type">false</span>, <span class="type">false</span>,
+                    ERR_INVALID_SIZE);
+    return_value_if(GapBuffer_insert(buffer, string, position) == <span class="type">false</span>, <span class="type">false</span>, ERR_OUT_OF_MEMORY);
+    <span class="func">return</span> <span class="type">true</span>;
+}
+      </code></pre>
+      <h2 id="conclusion"><a href="#conclusion">Conclusion</a></h2>
+      <p>Hope you found this post interesting and also check out this <a href="https://github.com/ss141309/gapbuffer" target="_blank" rel="noopener">project</a> on github.</p>
+    </div>
+  </body>
+</html>
