@@ -37,7 +37,7 @@
               <li><a href="https://www.linkedin.com/in/sameer-singh-425b0724b/">Linkedin</a></li>
             </ul>
           </nav>
-        
+
     </header>
       <h1 id="writing-a-gap-buffer-in-c"><a href="#writing-a-gap-buffer-in-c">Writing a Gap Buffer Implementation in C</a></h1>
       <div class="meta"><time datetime="2024-06-16">June 16, 2024</time></div>
@@ -69,7 +69,7 @@ respectively.</p>
       <div class="example">
 	['h','1','e','l','l','o',____]
       </div>
-      <p>You can see that we had to shift every element in front of <code>'1'</code> forward. This has to be done for every insertion and deletion we perform on this array. If we try to do the same operations in a <strong>gap buffer</strong>, this is what would happen:</p>
+      <p>You can see that we had to shift every element in front of <code>'1'</code> forward. This has to be done for every insertion and deletion we perform on this array. If we try to do the same operations in a <strong>gap buffer</strong>, it would result in:</p>
       <div class="example">
 	['h','e','l','l','o',_____]
       </div>
@@ -160,7 +160,7 @@ I have also used the types and string representation as suggested by Chris in hi
     }
 
     <span class="func">return</span> <span class="type">true</span>;
-}	  
+}
       </code></pre>
       <p>We check whether the length of the string to be inserted is less than the gap length or not, if it is we simply return from the function. The real work starts if the string length is bigger. We now have to calculate the new buffer size to accomodate the string, this is done by allocating double the string length to the buffer.</p>
       <pre><code>
@@ -185,7 +185,7 @@ I have also used the types and string representation as suggested by Chris in hi
     }
 
     buffer-&gt;<span class="type">gap_start</span> = position;
-}	  
+}
       </code></pre>
       <p>After expanding the gap, we have to make sure if it is at the correct position (the position where the string has to be inserted), if it is, we simply return from the function, this is what makes the text insertion <em>O(1)</em> if the gap is correctly placed.</p>
       <p>Apart from this we have two conditions which moves the gap either left or right as necessary.</p>
